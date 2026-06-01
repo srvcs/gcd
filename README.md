@@ -1,63 +1,69 @@
 # srvcs-gcd
 
-The greatest-common-divisor orchestrator of the srvcs.cloud distributed standard
-library.
+## Name
 
-Its single concern: **number theory: greatest common divisor.** It owns the
-*control flow* — an iterative Euclidean loop — but does no arithmetic of its own.
-It asks [`srvcs-iszero`](https://github.com/srvcs/iszero) whether the divisor has
-reached zero and [`srvcs-modulo`](https://github.com/srvcs/modulo) for each
-`a mod b`, then folds the results until the loop terminates.
+| Field | Value |
+| --- | --- |
+| Service | `srvcs-gcd` |
+| Slug | `gcd` |
+| Repository | `srvcs/gcd` |
+| Package | `srvcs-gcd` |
+| Kind | `orchestrator` |
 
-```
-gcd(a, b):
-    x, y = a, b
-    while not iszero(y):
-        r = modulo(x, y)
-        x, y = y, r
-    return x
-```
+## Function
 
-`gcd(a, 0) == a` and `gcd(0, 0) == 0` fall out naturally: the first `iszero`
-check breaks immediately when `b == 0`.
+number theory: greatest common divisor
+
+## Dependencies
+
+| Dependency | Repository |
+| --- | --- |
+| `srvcs-modulo` | [srvcs/modulo](https://github.com/srvcs/modulo) |
+| `srvcs-iszero` | [srvcs/iszero](https://github.com/srvcs/iszero) |
 
 ## API
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/` | Service identity, concern, and dependency list |
-| `POST` | `/` | Compute `gcd(a, b)` |
-| `GET` | `/healthz` `/readyz` `/metrics` `/openapi.json` | srvcs service standard surface |
+| `GET` | `/` | Service identity |
+| `POST` | `/` | Evaluate the service function |
+| `GET` | `/healthz` | Liveness probe |
+| `GET` | `/readyz` | Readiness probe |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/openapi.json` | OpenAPI document |
 
-```sh
-curl -s -X POST localhost:8080/ -H 'content-type: application/json' -d '{"a": 12, "b": 8}'
-# {"a":12,"b":8,"result":4}
-```
+## Inputs
 
-Responses:
+| Name | Type | Required |
+| --- | --- | --- |
+| `a` | `integer` | yes |
+| `b` | `integer` | yes |
 
-- `200 {"a": a, "b": b, "result": n}` — evaluated.
-- `422` — a dependency rejected the input, forwarded verbatim.
-- `500` — the Euclidean loop did not converge within the iteration cap (a
-  misbehaving dependency).
-- `503` — a dependency is unavailable.
+## Outputs
 
-## Dependencies
-
-- [`srvcs-modulo`](https://github.com/srvcs/modulo)
-- [`srvcs-iszero`](https://github.com/srvcs/iszero)
+| Name | Type |
+| --- | --- |
+| `a` | `integer` |
+| `b` | `integer` |
+| `result` | `integer` |
 
 ## Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `SRVCS_BIND_ADDR` | `0.0.0.0:8080` | Bind address |
-| `SRVCS_MODULO_URL` | `http://127.0.0.1:8084` | Base URL of `srvcs-modulo` |
-| `SRVCS_ISZERO_URL` | `http://127.0.0.1:8085` | Base URL of `srvcs-iszero` |
 | `SRVCS_ENV` | `development` | Environment label for logs |
 | `RUST_LOG` | `info,tower_http=info` | Tracing filter |
+| `SRVCS_ISZERO_URL` | `http://127.0.0.1:8085` | Base URL for srvcs-iszero |
+| `SRVCS_MODULO_URL` | `http://127.0.0.1:8084` | Base URL for srvcs-modulo |
 
-## Local checks
+## Error Behavior
+
+- `422` means the request could not be evaluated for the documented input shape.
+- `503` means a required dependency was unavailable or returned an unexpected response.
+- Dependency validation errors are forwarded when this service delegates validation.
+
+## Local Checks
 
 ```sh
 cargo fmt --check
@@ -65,10 +71,8 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-Orchestration tests stand up *computing* mock `srvcs-modulo` and `srvcs-iszero`
-services in-process — they read the request body and return the real
-`a % b` / `value == 0`, so the Euclidean loop is genuinely exercised. See
-[`srvcs/platform`](https://github.com/srvcs/platform) for the shared standard.
+See the [srvcs service standard](https://github.com/srvcs/platform/blob/main/STANDARD.md) for the full operational contract.
 
-> Note: the `cargoHash` in `flake.nix` is inherited from the template and must be
-> refreshed with a `nix build` before the Nix gates pass.
+## Metadata
+
+Machine-readable service metadata lives in `srvcs.yaml`. Keep it aligned with this README when the service contract changes.
